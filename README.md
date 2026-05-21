@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/icon.png" alt="Code-as-Room icon" width="96">
+  <img src="assets/icon.png" alt="Code-as-Room icon" width="150">
 </p>
 
 ## Overview
