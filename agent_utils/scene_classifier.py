@@ -257,7 +257,7 @@ def classify_scene(
     memory=None,
     manual_override: Optional[str] = None,
     use_llm: bool = True,
-    model: str = "gemini-3-flash-preview-thinking",
+    model: str = "gemini-3.1-pro-preview",
     base_url: Optional[str] = None,
     api_key: Optional[str] = None,
     verbose: bool = True,

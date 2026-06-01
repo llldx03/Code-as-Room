@@ -3251,7 +3251,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
                         help="Do not read/write the Memory store")
     parser.add_argument("--dry-run", action="store_true",
                         help="Only do plane discovery, skip the LLM call")
-    parser.add_argument("--model", help="LLM model override",default="gemini-3-flash-preview-thinking")
+    parser.add_argument("--model", help="LLM model override",default="gemini-3.1-pro-preview")
     parser.add_argument("--base-url", help="LLM base URL override", default=os.environ.get("SCENEGEN_BASE_URL"))
     parser.add_argument(
         "--api-key",

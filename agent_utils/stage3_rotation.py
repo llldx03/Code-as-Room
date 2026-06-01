@@ -622,6 +622,10 @@ For each issue, set the rotation= parameter to use the target_rotation_z value. 
     # ------------------------------------------------------------------
     def _build_render_script(self, code_file: str, render_image: str) -> str:
         """Build the Blender render script (same as Stage 3)."""
+        # Use forward slashes to avoid Windows backslash escape issues
+        # (e.g. \r → carriage-return) in the generated Python script.
+        code_file = code_file.replace("\\", "/")
+        render_image = render_image.replace("\\", "/")
         return f'''
 import bpy
 import sys
