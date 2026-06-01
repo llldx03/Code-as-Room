@@ -281,14 +281,11 @@ Please generate complete, executable Blender Python code.
             f.write(self.current_code)
 
         # Render script
-        # Use forward slashes in paths embedded in the f-string template to avoid
-        # Windows backslash escape issues (e.g. \r → carriage-return) when the
-        # generated script is executed by Blender's Python interpreter.
         render_image = os.path.join(self.output_dir, "render_topdown.png")
         layout_json = os.path.join(self.output_dir, "_layout.json")
-        _code_file_safe = code_file.replace("\\", "/")
-        _render_image_safe = render_image.replace("\\", "/")
-        _layout_json_safe = layout_json.replace("\\", "/")
+        _code_file = code_file.replace("\\", "/")
+        _render_image = render_image.replace("\\", "/")
+        _layout_json = layout_json.replace("\\", "/")
         render_script = f'''
 import bpy
 import sys
@@ -304,7 +301,7 @@ except:
     except:
         bpy.context.scene.render.engine = 'CYCLES'
 
-code_text = open("{_code_file_safe}").read()
+code_text = open("{_code_file}").read()
 
 # Inject missing helper stubs so exec() doesn't fail on undefined functions
 if 'def create_collection' not in code_text:
@@ -358,7 +355,7 @@ for _obj in bpy.data.objects:
         "depth": round(_obj.dimensions.y, 2),
         "height": round(_obj.dimensions.z, 2),
     }})
-with open("{_layout_json_safe}", "w") as _f:
+with open("{_layout_json}", "w") as _f:
     _json.dump(_layout, _f, indent=2)
 print(f"Layout JSON: {{len(_layout)}} furniture objects")
 
@@ -466,7 +463,7 @@ if hasattr(bpy.context.scene, 'eevee'):
 
 bpy.context.scene.render.resolution_x = 1024
 bpy.context.scene.render.resolution_y = 1024
-bpy.context.scene.render.filepath = "{_render_image_safe}"
+bpy.context.scene.render.filepath = "{_render_image}"
 bpy.context.scene.render.image_settings.file_format = 'PNG'
 bpy.context.scene.render.film_transparent = False
 bpy.context.scene.view_layers[0].use_pass_combined = True
@@ -577,7 +574,27 @@ print("Labels removed, render done!")
                 )
                 for _a, _b in dropped_arch_pairs[:8]:
                     self._log(f"    · {_a} vs {_b}  (ignored)", "info")
-            
+
+            # [IDEA 1] Deterministic geometric verification — call site only.
+            # All logic lives in agent_utils/stage3/geometry_verifier.py. It
+            # augments `analysis` with overlaps / out-of-bounds the visual critic
+            # misses (so the existing fixer repairs them) and gates `score` so the
+            # loop cannot pass while hard geometric violations remain. Guarded so
+            # any failure leaves the original behaviour untouched.
+            try:
+                from geometry_verifier import augment_analysis_with_geometry
+                score = augment_analysis_with_geometry(
+                    analysis,
+                    layout_table,
+                    scene_code=self.current_code,
+                    stage1_json=self.stage1_json,
+                    score=score,
+                    output_dir=self.output_dir,
+                    log=self._log,
+                )
+            except Exception as _geo_exc:
+                self._log(f"Geometry verifier unavailable, skipping: {_geo_exc}", "warning")
+
             issues = []
             for obj in analysis.get("missing_objects", []):
                 desc = obj.get("description", obj.get("type", "?")) if isinstance(obj, dict) else str(obj)
