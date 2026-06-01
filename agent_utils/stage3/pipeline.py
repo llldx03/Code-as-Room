@@ -221,9 +221,11 @@ class Stage3Pipeline:
             # Save render script (using absolute path)
             render_file = os.path.abspath(os.path.join(self.config.output_dir, "_temp_render.py"))
             with open(render_file, "w") as f:
+                # Use forward slashes to avoid Windows backslash escape issues
+                # (e.g. \r → carriage-return) in the generated Python script.
                 f.write(render_script.format(
-                    code_file=code_file,
-                    output_image=output_image
+                    code_file=code_file.replace("\\", "/"),
+                    output_image=output_image.replace("\\", "/")
                 ))
 
             # Run Blender
