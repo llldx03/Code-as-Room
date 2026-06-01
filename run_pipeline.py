@@ -353,7 +353,10 @@ class PipelineConfig:
         stage1_api_key: str = None,
 
         # Stage 2 configuration
-        stage2_model: str = "gemini-3.1-pro-preview-thinking",
+        # None → follow the global --model (so switching the whole pipeline,
+        # e.g. to Qwen, only needs the global model/base_url/api_key set).
+        # Pin a different model for Stage 2 only via --stage2-model if desired.
+        stage2_model: str = None,
         #stage2_model: str = "gpt-5.5",
         stage2_base_url: str = None,
         stage2_api_key: str = None,
@@ -492,12 +495,16 @@ class PipelineConfig:
         self.stage2_api_key = stage2_api_key
 
         # Stage7–9 & small-object dedicated LLM overrides
-        self.stage7_model =  "gemini-3.1-pro-preview-thinking"
+        # Respect the constructor arg (from --stage5-model); None → fall back
+        # to the global model via _resolve_stage_llm. Previously hardcoded to
+        # gemini, which silently ignored any global/per-stage override.
+        self.stage7_model = stage7_model
         self.stage7_base_url = stage7_base_url
         self.stage7_api_key = stage7_api_key
 
 
-        self.stage8_model =  "gpt-5.5"
+        # Respect the constructor arg (from --stage6-model); None → global model.
+        self.stage8_model = stage8_model
         self.stage8_base_url = stage8_base_url
         self.stage8_api_key = stage8_api_key
 
@@ -506,7 +513,8 @@ class PipelineConfig:
         self.stage7_small_objects_base_url = stage7_small_objects_base_url
         self.stage7_small_objects_api_key = stage7_small_objects_api_key
 
-        self.stage8_small_describe_model =  "gemini-3.1-pro-preview-thinking"
+        # Respect the constructor arg (from --stage8-small-describe-model); None → global model.
+        self.stage8_small_describe_model = stage8_small_describe_model
         self.stage8_small_describe_base_url = stage8_small_describe_base_url
         self.stage8_small_describe_api_key = stage8_small_describe_api_key
 
@@ -539,7 +547,7 @@ class PipelineConfig:
         self.stage8_geometry_retry_delay = stage8_geometry_retry_delay
 
         # LLM
-        self.model = model or os.environ.get("SCENEGEN_MODEL") or "gemini-3.1-pro-preview-thinking"
+        self.model = model or os.environ.get("SCENEGEN_MODEL") or "gemini-3.1-pro-preview"
         self.base_url = base_url or os.environ.get("SCENEGEN_BASE_URL")
         self.api_key = api_key or os.environ.get("SCENEGEN_API_KEY") or os.environ.get("OPENAI_API_KEY")
         self.stage2_max_tokens = stage2_max_tokens
@@ -1776,6 +1784,13 @@ class UnifiedPipeline:
             if stage_num in (8, 9) and not self.config.detail_small_objects:
                 continue
 
+            # Stage 11 (texture image generation) is opt-out via --skip-texture
+            # (e.g. a Qwen-only run with no image-generation backend). Stage 12
+            # still runs using Stage 10's procedural materials from Memory.
+            if stage_num == 11 and not getattr(self.config, "stage11_enabled", True):
+                self._log("Stage 11 (texture) skipped (--skip-texture)", "info")
+                continue
+
             total_stages += 1
             
             try:
@@ -2218,6 +2233,8 @@ Recommended flow: Stage 1-4 → Stage 5-12
 
     # Stage 3 arguments
     parser.add_argument("--no-iterate", action="store_true", help="Disable Stage 3 iteration")
+    parser.add_argument("--skip-texture", action="store_true",
+                        help="Skip Stage 11 (texture image generation); Stage 12 still runs using Stage 10 procedural materials")
     parser.add_argument("--target", "-t", type=float, default=0.85, help="Stage 3 target score")
     parser.add_argument("--blender", "-b", 
                         default="/Applications/Blender.app/Contents/MacOS/Blender",
@@ -2703,6 +2720,12 @@ Recommended flow: Stage 1-4 → Stage 5-12
     if args.wall_intensity:
         config.stage10_wall_intensity = args.wall_intensity
 
+    # Skip Stage 11 (texture image generation) when requested, e.g. a Qwen-only
+    # run with no image-generation backend. Stage 12 still runs using Stage 10's
+    # procedural materials from Memory.
+    if args.skip_texture:
+        config.stage11_enabled = False
+
     # Run the pipeline.
     pipeline = UnifiedPipeline(config)
     result = pipeline.run()
@@ -2711,4 +2734,16 @@ Recommended flow: Stage 1-4 → Stage 5-12
 
 
 if __name__ == "__main__":
+    # Force UTF-8 mode on Windows. LLM-generated Blender code often contains
+    # non-ASCII characters (e.g. the degree sign '°' that Qwen and other models
+    # emit in comments like "rotate 90°"). Without UTF-8 mode, open(..., "w")
+    # uses the Windows locale codec (GBK/cp936) and writes '°' as byte 0xA1;
+    # Blender's embedded Python then reads the file as UTF-8 and raises
+    # UnicodeDecodeError at render time, failing every Stage 3 render. Re-exec
+    # once under `-X utf8` so all file writes are UTF-8 (Blender reads UTF-8 by
+    # default). No-op if already in UTF-8 mode or on non-Windows platforms.
+    if sys.platform == "win32" and not sys.flags.utf8_mode:
+        os.environ["PYTHONUTF8"] = "1"
+        os.environ.setdefault("PYTHONIOENCODING", "utf-8")
+        os.execv(sys.executable, [sys.executable, "-X", "utf8", *sys.argv])
     exit(main())
