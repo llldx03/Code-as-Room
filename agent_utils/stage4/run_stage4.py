@@ -64,7 +64,7 @@ class Stage4Runner:
         output_dir: str = "./output",
         verbose: bool = True,
         memory_file: str = "agent_memory.jsonl",
-        model: str = "gemini-3-flash-preview-thinking",
+        model: str = "gemini-3.1-pro-preview",
         base_url: str = None,
         api_key: str = None,
     ):
