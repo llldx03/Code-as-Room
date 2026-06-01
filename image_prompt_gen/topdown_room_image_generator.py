@@ -385,7 +385,7 @@ def _call_gemini_image(
     import requests
 
     root = _normalize_gemini_base_url(base_url)
-    url = f"{root}/v1beta/models/{model}:generateContent/"
+    url = f"{root}/v1beta/models/{model}:generateContent?key={api_key}"
 
     parts: list = [{"text": prompt_text}]
     for img_bytes in (reference_images or []):
@@ -413,7 +413,6 @@ def _call_gemini_image(
     }
     body = json.dumps(payload, ensure_ascii=False)
     headers = {
-        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
 
